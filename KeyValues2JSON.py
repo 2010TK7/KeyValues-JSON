@@ -1,15 +1,19 @@
 import re, sys
 __author__ = "TK7"
-__version__ = "1.1"
+__version__ = "1.2"
 
 def preplan(text, index=0, hardplan=False):
-    text = re.sub("//.*", "", text)
+    text = re.sub("(?<!\:)//.*", "", text)
     start = text.find('"')
     ender = max(text.rfind('"'), text.rfind('}'))+1
     text = text[start: ender]
+    text = re.sub("\"\"\"", r'" ""', text)
+    text = re.sub("\"\s+\"(\s+)\"", r'" "^\1"', text)
+    text = re.sub("(?<=[\"\{\}])\s+(?=[\"\{\}])", "\r\n", text)
+    text = re.sub("\"\^(\s+)\"", r'"\1"', text)
     if type(hardplan) == type(lambda:0):
         text = hardplan(text)
-    return [re.split("(?<=[\"\{\}])\s+(?=[\"\{\}])", text), text][index]
+    return [re.split("\r\n", text), text][index]
 
 def convert(array, index=0):
     def _assign(table, key, value):
@@ -39,17 +43,9 @@ def convert(array, index=0):
             checker = False
         elif array[i+index] == '}':
             if checker:
-                print("ERROR: last key no value.")
+                print("ERROR: last key no value. (middle table)")
                 sys.exit()
             return [table, i+index]
-        elif array[i+index] == '"' and array[i+index+1] == '"':
-            if checker:
-                _assign(table, key, "")
-                checker = False
-            else:
-                key = ""
-                checker = True
-            index += 1
         else:
             if checker:
                 _assign(table, key, array[i+index][1: -1])
@@ -58,7 +54,7 @@ def convert(array, index=0):
                 key = array[i+index][1: -1]
                 checker = True
     if checker:
-        print("ERROR: last key no value.")
+        print("ERROR: last key no value. (main table)")
         sys.exit()
     return table
 
@@ -92,3 +88,4 @@ def undojson(table, filename):
     text = backer(table)
     with open(filename, "w", encoding="utf-8") as file:
         file.write(text)
+
