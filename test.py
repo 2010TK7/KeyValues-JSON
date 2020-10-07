@@ -1,17 +1,21 @@
 #%%
+import json, requests
 import KeyValues2JSON as KV
-import requests
 from bs4 import BeautifulSoup
-filename = "tf_proto_obj_defs_tchinese"
 #%%
-text = KV.readurl("https://wiki.teamfortress.com" + BeautifulSoup(requests.get("https://wiki.teamfortress.com/wiki/File:" + filename + ".txt").content, "html5lib").find(class_="fullMedia").a["href"])
-table = KV.KeyValues2dict(text)
-KV.dict2json(table, filename + ".json")
+filename = "tf_proto_obj_defs_tchinese.txt"
+text = requests.get("https://wiki.teamfortress.com" + BeautifulSoup(requests.get("https://wiki.teamfortress.com/wiki/File:" + filename).content, "html5lib").find(class_="fullMedia").a["href"])
+text.encoding = "utf-8"
+text = text.text
+KV.savejson(text, "tf_proto_obj_defs_tchinese.json")
 #%%
-table = KV.json2dict(filename + ".json")
-text = KV.dict2KeyValues(table)
-KV.savefile(text, filename + ".txt")
+filename = "gamemodes.txt"
+with open(filename, "r", encoding="utf-8") as file:
+    text = file.read()
+KV.savejson(text, "gamemodes.json")
 #%%
-table = KV.KeyValues2dict(KV.readfile(filename + ".txt", "utf-8"))
-table = KV.KeyValues2dict(text)
-KV.dict2json(table, filename + "2.json")
+filename = "tf_proto_obj_defs_tchinese.txt"
+with open("tf_proto_obj_defs_tchinese.json", "r", encoding="utf-8") as file:
+    table = json.load(file)
+KV.undojson(table, filename)
+#%%

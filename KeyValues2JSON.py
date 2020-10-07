@@ -1,80 +1,94 @@
-import json, sys, requests
+import re, sys
 __author__ = "TK7"
-__version__ = "1.0"
+__version__ = "1.1"
 
-def readfile(filename, code="utf-16-le"):
-    with open(filename, "r", encoding=code) as f:
-        return f.read()
+def preplan(text, index=0, hardplan=False):
+    text = re.sub("//.*", "", text)
+    start = text.find('"')
+    ender = max(text.rfind('"'), text.rfind('}'))+1
+    text = text[start: ender]
+    if type(hardplan) == type(lambda:0):
+        text = hardplan(text)
+    return [re.split("(?<=[\"\{\}])\s+(?=[\"\{\}])", text), text][index]
 
-def readurl(url, code="utf-8"):
-    r = requests.get(url)
-    r.encoding = code
-    return r.text
-
-def savefile(text, filename, code="utf-8"):
-    with open(filename, "w", encoding=code) as f:
-        return f.write(text)
-
-def KeyValues2dict(text, index=0, marker=False):
-    table = {}
-    charmode = False
-    checker = False
-    for i in range(len(text)):
-        if not charmode:
-            if text[i+index] == '"':
-                list = []
-                charmode = True
-            elif text[i+index] == '{':
-                if not checker:
-                    print("ERROR: no key.")
-                    sys.exit()
-                table[key], index = KeyValues2dict(text, i+index+1, True)
-                checker = False
-                index -= i
-            elif text[i+index] == '}':
-                if checker:
-                    print("ERROR: last key no value.")
-                    sys.exit()
-                if marker:
-                    return [table, i+index-1]
-                else:
-                    return table
-        else:
-            if text[i+index] == '"':
-                if text[i+index-1] == '\\':
-                    list.append('"')
-                else:
-                    if not checker:
-                        key = ''.join(list)
-                        checker = True
-                    else:
-                        table[key] = ''.join(list)
-                        checker = False
-                    charmode = False
-            elif text[i+index] == '\n':
-                list.extend(['\\','n'])
+def convert(array, index=0):
+    def _assign(table, key, value):
+        checker = False
+        if type(value) == list:
+            value, index = value
+            checker = True
+        try:
+            if type(table[key]) != list:
+                table[key] = [table[key], value]
             else:
-                list.append(text[i+index])
-
-def dict2KeyValues(table):
-    text = ""
-    charmode = False
+                table[key].append(value)
+        except:
+            table[key] = value
+        if checker:
+            return index
+    table = {}
     checker = False
-    for key, value in table.items():
-        text = text + '"' + key + '"'
-        if type(value) == dict:
-            text = text + "\n{\n" + dict2KeyValues(value) + "}\n"
-        elif type(value) == str:
-            text = text + "\t\"" + value + "\"\n"
+    for i in range(len(array)):
+        if i+index >= len(array):
+            break
+        if array[i+index] == '{':
+            if not checker:
+                print("ERROR: dict for no key.")
+                sys.exit()
+            index = _assign(table, key, convert(array, i+index+1))-i
+            checker = False
+        elif array[i+index] == '}':
+            if checker:
+                print("ERROR: last key no value.")
+                sys.exit()
+            return [table, i+index]
+        elif array[i+index] == '"' and array[i+index+1] == '"':
+            if checker:
+                _assign(table, key, "")
+                checker = False
+            else:
+                key = ""
+                checker = True
+            index += 1
         else:
-            print("ERROR: value only string and dict allowed.")
-            sys.exit()
+            if checker:
+                _assign(table, key, array[i+index][1: -1])
+                checker = False
+            else:
+                key = array[i+index][1: -1]
+                checker = True
+    if checker:
+        print("ERROR: last key no value.")
+        sys.exit()
+    return table
+
+def backer(table, index=0):
+    def _addtab(index):
+        text = ""
+        for i in range(index):
+            text += '\t'
+        return text
+    text = ""
+    for key, value in table.items():
+        if type(value) == dict:
+            text = text + _addtab(index) + '"' + key + "\"\n"
+            text = text + _addtab(index) + "{\n"
+            text = text + backer(value, index+1)
+            text = text + _addtab(index) + "}\n"
+        elif type(value) == list:
+            for v in value:
+                text = text + _addtab(index) + '"' + key + "\"\t\"" + v + "\"\n"
+        else:
+            text = text + _addtab(index) + '"' + key + "\"\t\"" + value + "\"\n"
     return text
 
-def dict2json(table, filename):
-    with open(filename, "w", encoding="utf-8") as f:
-        return json.dump(table, f, ensure_ascii=False)
+def savejson(text, filename):
+    import json
+    table = convert(preplan(text))
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(table, file)
 
-def json2dict(filename):
-    with open(filename, "r", encoding="utf-8") as f:
-        return json.load(f)
+def undojson(table, filename):
+    text = backer(table)
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(text)
